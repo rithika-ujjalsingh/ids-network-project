@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NIDS // Network Intrusion Detection System</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+    :root {
+        --bg-navy: #060b18;
+        --panel-navy: #0c1730;
+        --panel-border: #1c2f52;
+        --matrix-green: #00ff8c;
+        --neon-blue: #3df0ff;
+        --gold: #ffce54;
+        --crit: #ff3b5c;
+        --high: #ff8c42;
+        --med: #ffce54;
+        --low: #3df0ff;
+        --text-dim: #7e95bf;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+        margin: 0;
+        font-family: 'Courier New', 'Consolas', monospace;
+        background: radial-gradient(circle at 50% -10%, #0e1c3a 0%, var(--bg-navy) 55%);
+        color: #d6e6ff;
+        min-height: 100vh;
+        padding: 24px;
+    }
+
+    header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 16px;
+        border-bottom: 1px solid var(--panel-border);
+        padding-bottom: 16px;
+        margin-bottom: 24px;
+    }
+
+    header h1 {
+        margin: 0;
+        font-size: 1.6rem;
+        letter-spacing: 2px;
+        color: var(--matrix-green);
+        text-shadow: 0 0 8px rgba(0,255,140,0.45);
+    }
+
+    header h1 span { color: var(--neon-blue); }
+
+    .status-pill {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.85rem;
+        padding: 6px 14px;
+        border: 1px solid var(--panel-border);
+        border-radius: 20px;
+        background: var(--panel-navy);
+    }
+
+    .dot {
+        width: 10px; height: 10px; border-radius: 50%;
+        background: var(--crit);
+        box-shadow: 0 0 8px var(--crit);
+    }
+    .dot.live {
+        background: var(--matrix-green);
+        box-shadow: 0 0 8px var(--matrix-green);
+        animation: pulse 1.4s infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.35; }
+    }
+
+    .controls { display: flex; gap: 10px; }
+
+    button {
+        font-family: inherit;
+        font-size: 0.85rem;
+        letter-spacing: 1px;
+        padding: 10px 20px;
+        border-radius: 6px;
+        border: 1px solid var(--panel-border);
+        background: var(--panel-navy);
+        color: #d6e6ff;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        text-transform: uppercase;
+    }
+
+    #startBtn { border-color: var(--matrix-green); color: var(--matrix-green); }
+    #startBtn:hover { background: rgba(0,255,140,0.12); }
+
+    #stopBtn { border-color: var(--crit); color: var(--crit); }
+    #stopBtn:hover { background: rgba(255,59,92,0.12); }
+
+    #clearBtn { border-color: var(--gold); color: var(--gold); }
+    #clearBtn:hover { background: rgba(255,206,84,0.12); }
+
+    button:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .card {
+        background: var(--panel-navy);
+        border: 1px solid var(--panel-border);
+        border-radius: 10px;
+        padding: 16px 18px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .card::before {
+        content: "";
+        position: absolute;
+        top: 0; left: 0; right: 0; height: 2px;
+        background: linear-gradient(90deg, var(--matrix-green), var(--neon-blue));
+    }
+
+    .card .label {
+        font-size: 0.7rem;
+        letter-spacing: 2px;
+        color: var(--text-dim);
+        text-transform: uppercase;
+        margin-bottom: 6px;
+    }
+
+    .card .value {
+        font-size: 1.9rem;
+        font-weight: bold;
+        color: var(--neon-blue);
+        text-shadow: 0 0 6px rgba(61,240,255,0.4);
+    }
+
+    .card.alert .value { color: var(--gold); }
+
+    .panels {
+        display: grid;
+        grid-template-columns: 1.3fr 1fr;
+        gap: 20px;
+    }
+
+    @media (max-width: 900px) {
+        .panels { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+        background: var(--panel-navy);
+        border: 1px solid var(--panel-border);
+        border-radius: 10px;
+        padding: 18px;
+    }
+
+    .panel h2 {
+        margin: 0 0 14px 0;
+        font-size: 0.95rem;
+        letter-spacing: 2px;
+        color: var(--matrix-green);
+        text-transform: uppercase;
+        border-bottom: 1px solid var(--panel-border);
+        padding-bottom: 10px;
+    }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    th, td {
+        padding: 8px 6px;
+        text-align: left;
+        border-bottom: 1px solid var(--panel-border);
+        white-space: nowrap;
+    }
+    th {
+        color: var(--text-dim);
+        text-transform: uppercase;
+        font-size: 0.7rem;
+        letter-spacing: 1px;
+    }
+
+    .table-wrap { max-height: 420px; overflow-y: auto; }
+
+    .sev {
+        font-size: 0.7rem;
+        font-weight: bold;
+        padding: 3px 10px;
+        border-radius: 12px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    .sev-critical { color: var(--crit); border: 1px solid var(--crit); }
+    .sev-high     { color: var(--high); border: 1px solid var(--high); }
+    .sev-medium   { color: var(--med);  border: 1px solid var(--med); }
+    .sev-low      { color: var(--low);  border: 1px solid var(--low); }
+
+    .empty-row td {
+        text-align: center;
+        color: var(--text-dim);
+        padding: 30px 0;
+    }
+
+    footer {
+        margin-top: 24px;
+        text-align: center;
+        font-size: 0.75rem;
+        color: var(--text-dim);
+        letter-spacing: 1px;
+    }
+
+    canvas { max-height: 260px; }
+</style>
+</head>
+<body>
+
+<header>
+    <h1>NIDS <span>// Network Intrusion Detection System</span></h1>
+    <div class="controls">
+        <div class="status-pill">
+            <div class="dot" id="statusDot"></div>
+            <span id="statusText">STOPPED</span>
+        </div>
+        <button id="startBtn" onclick="startEngine()">Start</button>
+        <button id="stopBtn" onclick="stopEngine()" disabled>Stop</button>
+        <button id="clearBtn" onclick="clearAlerts()">Clear Alerts</button>
+    </div>
+</header>
+
+<section class="grid">
+    <div class="card">
+        <div class="label">Total Packets</div>
+        <div class="value" id="statTotal">0</div>
+    </div>
+    <div class="card">
+        <div class="label">TCP Packets</div>
+        <div class="value" id="statTcp">0</div>
+    </div>
+    <div class="card">
+        <div class="label">UDP Packets</div>
+        <div class="value" id="statUdp">0</div>
+    </div>
+    <div class="card">
+        <div class="label">ICMP Packets</div>
+        <div class="value" id="statIcmp">0</div>
+    </div>
+    <div class="card alert">
+        <div class="label">Alerts Generated</div>
+        <div class="value" id="statAlerts">0</div>
+    </div>
+</section>
+
+<section class="panels">
+    <div class="panel">
+        <h2>Live Alert Feed</h2>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Type</th>
+                        <th>Source IP</th>
+                        <th>Dest IP</th>
+                        <th>Description</th>
+                        <th>Severity</th>
+                    </tr>
+                </thead>
+                <tbody id="alertsBody">
+                    <tr class="empty-row"><td colspan="6">No alerts yet. Start the engine to begin monitoring.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h2>Alerts by Severity</h2>
+        <canvas id="severityChart"></canvas>
+        <h2 style="margin-top:24px;">Alerts by Type</h2>
+        <canvas id="typeChart"></canvas>
+    </div>
+</section>
+
+<footer>
+    RIVI Enterprises &middot; NIDS Dashboard &middot; Built with Flask + Scapy
+</footer>
+
+<script>
+const POLL_INTERVAL = 2000;
+
+const severityChart = new Chart(document.getElementById('severityChart'), {
+    type: 'doughnut',
+    data: {
+        labels: ['Critical', 'High', 'Medium', 'Low'],
+        datasets: [{
+            data: [0, 0, 0, 0],
+            backgroundColor: ['#ff3b5c', '#ff8c42', '#ffce54', '#3df0ff'],
+            borderColor: '#0c1730',
+            borderWidth: 2
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { labels: { color: '#d6e6ff' } } }
+    }
+});
+
+const typeChart = new Chart(document.getElementById('typeChart'), {
+    type: 'bar',
+    data: {
+        labels: [],
+        datasets: [{
+            label: 'Alerts',
+            data: [],
+            backgroundColor: '#00ff8c'
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            x: { ticks: { color: '#7e95bf' }, grid: { color: '#1c2f52' } },
+            y: { ticks: { color: '#7e95bf' }, grid: { color: '#1c2f52' }, beginAtZero: true }
+        },
+        plugins: { legend: { display: false } }
+    }
+});
+
+function setStatus(running) {
+    const dot = document.getElementById('statusDot');
+    const text = document.getElementById('statusText');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+
+    if (running) {
+        dot.classList.add('live');
+        text.textContent = 'MONITORING';
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+    } else {
+        dot.classList.remove('live');
+        text.textContent = 'STOPPED';
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+    }
+}
+
+async function startEngine() {
+    await fetch('/api/start', { method: 'POST' });
+    refreshStatus();
+}
+
+async function stopEngine() {
+    await fetch('/api/stop', { method: 'POST' });
+    refreshStatus();
+}
+
+async function clearAlerts() {
+    await fetch('/api/alerts/clear', { method: 'POST' });
+    refreshAlerts();
+    refreshSummary();
+}
+
+async function refreshStatus() {
+    try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        setStatus(data.running);
+
+        const s = data.stats;
+        document.getElementById('statTotal').textContent = s.total_packets;
+        document.getElementById('statTcp').textContent = s.tcp_packets;
+        document.getElementById('statUdp').textContent = s.udp_packets;
+        document.getElementById('statIcmp').textContent = s.icmp_packets;
+        document.getElementById('statAlerts').textContent = s.alerts_generated;
+    } catch (e) {
+        console.error('status fetch failed', e);
+    }
+}
+
+function severityClass(sev) {
+    const s = (sev || '').toLowerCase();
+    if (s === 'critical') return 'sev-critical';
+    if (s === 'high') return 'sev-high';
+    if (s === 'medium') return 'sev-medium';
+    return 'sev-low';
+}
+
+async function refreshAlerts() {
+    try {
+        const res = await fetch('/api/alerts?limit=50');
+        const alerts = await res.json();
+        const body = document.getElementById('alertsBody');
+
+        if (!alerts.length) {
+            body.innerHTML = '<tr class="empty-row"><td colspan="6">No alerts yet. Start the engine to begin monitoring.</td></tr>';
+            return;
+        }
+
+        body.innerHTML = alerts.map(a => `
+            <tr>
+                <td>${a.timestamp.replace('T', ' ')}</td>
+                <td>${a.alert_type}</td>
+                <td>${a.src_ip ?? '-'}</td>
+                <td>${a.dst_ip ?? '-'}</td>
+                <td>${a.description ?? ''}</td>
+                <td><span class="sev ${severityClass(a.severity)}">${a.severity ?? ''}</span></td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        console.error('alerts fetch failed', e);
+    }
+}
+
+async function refreshSummary() {
+    try {
+        const res = await fetch('/api/summary');
+        const summary = await res.json();
+
+        const sevMap = summary.by_severity || {};
+        severityChart.data.datasets[0].data = [
+            sevMap.critical || 0,
+            sevMap.high || 0,
+            sevMap.medium || 0,
+            sevMap.low || 0
+        ];
+        severityChart.update();
+
+        const typeMap = summary.by_type || {};
+        typeChart.data.labels = Object.keys(typeMap);
+        typeChart.data.datasets[0].data = Object.values(typeMap);
+        typeChart.update();
+    } catch (e) {
+        console.error('summary fetch failed', e);
+    }
+}
+
+function refreshAll() {
+    refreshStatus();
+    refreshAlerts();
+    refreshSummary();
+}
+
+refreshAll();
+setInterval(refreshAll, POLL_INTERVAL);
+</script>
+
+</body>
+</html>
