@@ -231,8 +231,8 @@ nmap -p 1-50 127.0.0.1
 
 **Rithika U**
 Cybersecurity Enthusiast | Founder, RIVI Enterprises
-- GitHub: [@rithisingh2020](https://github.com/rithisingh2020)
-- LinkedIn: [rithikasingh2626](https://linkedin.com/in/rithikasingh2626)
+- GitHub: [@rithisingh2020](https://github.com/rithika-ujjalsingh)
+- LinkedIn: [rithikasingh2626](https://www.linkedin.com/in/rithikaujjalsingh)
 
 ---
 
